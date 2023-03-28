@@ -28,8 +28,7 @@ Engine_many_to_many : CroneEngine {
 		    resetPos:start*frames,
 	    );
 	    
-	    env=EnvGen.ar(Env.asr(0.01,1,0.01,0),gate:trig,doneAction:2);
-	    //env=EnvGen.ar(Env.new(levels: [0,1,1,0],times: [0,frames,0],),gate: trig,doneAction:0	);
+	    env=EnvGen.ar(Env.asr(0.01,1,0.01,0),gate:trig,doneAction:0);
       
   	  snd=BufRd.ar(
 		    numChannels:1,
@@ -51,7 +50,7 @@ Engine_many_to_many : CroneEngine {
         Synth("bufplayer",target:context.server);
         });
         
-    buffers=Array.newClear(16);
+    buffers=Array.newClear(4);
     
     this.addCommand("file", "is", { arg msg;
 
@@ -63,7 +62,7 @@ Engine_many_to_many : CroneEngine {
 
                   var oldbuf;
 
-                  if(slot < 16 && slot >= 0, {
+                  if(slot < 4 && slot >= 0, {
 
                         newbuf = Buffer.read(context.server, path);
 
@@ -87,8 +86,12 @@ Engine_many_to_many : CroneEngine {
 
             }); 
          
-    this.addCommand("play", "ii", { arg msg;
-        synths[msg[1]-1].set(\buf,buffers[msg[1]],\trig,msg[2]);
+    this.addCommand("loop_play", "iii", { arg msg;
+        synths[msg[1]-1].set(\buf,buffers[msg[2]],\trig,msg[3]);
+        });
+    
+    this.addCommand("loop_buffer", "if", {arg msg;
+        synths[msg[1]-1].set(\buf,buffers[msg[2]]);
         });
         
     this.addCommand("loop_start", "if", {arg msg;
@@ -103,11 +106,11 @@ Engine_many_to_many : CroneEngine {
         synths[msg[1]-1].set(\loop,msg[2]);
         });
         
-    this.addCommand("rate", "if", {arg msg;
+    this.addCommand("loop_rate", "if", {arg msg;
         synths[msg[1]-1].set(\rate,msg[2]);
         });
     
-    this.addCommand("amp", "if", {arg msg;
+    this.addCommand("loop_vol", "if", {arg msg;
         synths[msg[1]-1].set(\amp,msg[2]);
         });
         
