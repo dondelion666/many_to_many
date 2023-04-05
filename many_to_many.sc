@@ -1,5 +1,5 @@
 // CroneEngine_one_to_many
-Engine_many_to_many : CroneEngine {
+Engine_many_to_many2 : CroneEngine {
 
     var buffers;
     var synths;
@@ -11,31 +11,21 @@ Engine_many_to_many : CroneEngine {
     alloc {
     
     SynthDef("bufplayer", {
-      arg out=0, buf, rate=1, start=0, end=1, trig=0, amp=1;
-      var env, snd, pos, frames;
+      arg out=0, buf=0, trig=0, start=0, end=1, rate=1, amp=1;
+      var env, snd, frames;
       
-      // rate is modified by BufRateScale to convert between sampling rates
-	    rate = rate*BufRateScale.kr(buf);
-	    // frames is the number of frames
-	    frames = BufFrames.kr(buf);
-	    
-	    // Phasor is a ramp
-	    pos=Phasor.ar(
-	      trig:trig,
-		    rate:rate,
-		    start:start*frames,
-		    end:end*frames,
-		    resetPos:start*frames,
-	    );
-	    
+      frames = BufFrames.kr(buf);
+      
 	    env=EnvGen.ar(Env.asr(0.01,1,0.01,0),gate:trig,doneAction:0);
       
-  	  snd=BufRd.ar(
+  	  snd=LoopBuf.ar(
 		    numChannels:1,
 		    bufnum:buf,
-		    phase:pos,
-		    loop: 1,
-		    interpolation:4,
+		    rate:rate,
+		    gate:trig,
+		    startPos:start*frames,
+		    startLoop:start*frames,
+		    endLoop:end*frames,
 	    );
 	    
 	    snd=snd*env*amp;
@@ -45,55 +35,39 @@ Engine_many_to_many : CroneEngine {
     
     context.server.sync;
     
-   
-    synths=Array.fill(16,{arg i;
-        Synth("bufplayer",target:context.server);
+    synths=Array.fill(32,{Synth("bufplayer",target:context.server);
         });
         
-    buffers=Array.newClear(4);
+    buffers=Array.fill(4, {Buffer.alloc(context.server,1,1)});
     
-    this.addCommand("file", "is", { arg msg;
-
-                  var slot = msg[1];
-
-                  var path = msg[2];
-
-                  var newbuf;
-
-                  var oldbuf;
-
-                  if(slot < 4 && slot >= 0, {
-
-                        newbuf = Buffer.read(context.server, path);
-
-                        // we should free the existing buf if there is one
-
-                        if(buffers[slot].notNil, {
-
-                              oldbuf = buffers[slot];
-
-                              buffers[slot] = newbuf;
-
-                              oldbuf.free;
-
-                        }, {
-
-                              buffers[slot] = newbuf;
-
-                        });
-
-                  });
-
-            }); 
+    context.server.sync;
+    
+    this.addCommand("buffer_file", "is", { arg msg;
+                    var buf_slot=msg[1]-1;
+                    var file_path=msg[2];
+                    
+                     "buffer_file".postln;
+                    msg[1].postln;
+                    msg[2].postln;
+                    
+                    Buffer.read(context.server, file_path, action:{ arg buf;
+                    buffers[buf_slot].free;
+                    buffers[buf_slot]=buf;
+                    });
+                    });
          
     this.addCommand("loop_play", "iii", { arg msg;
-        synths[msg[1]-1].set(\buf,buffers[msg[2]],\trig,msg[3]);
-        });
-    
-    this.addCommand("loop_buffer", "if", {arg msg;
-        synths[msg[1]-1].set(\buf,buffers[msg[2]]);
-        });
-        
+                    var synth_slot=msg[1]-1;
+                    var buf_slot=msg[2]-1;
+                    
+                    "loop_play".postln;
+                    msg[1].postln;
+                    msg[2].postln;
+                    msg[3].postln;
+                    
+                    synths[synth_slot].set(\buf,buffers[buf_slot],\trig,msg[3]);
+                    });
+                    
     this.addCommand("loop_start", "if", {arg msg;
         synths[msg[1]-1].set(\start,msg[2]);
         });
@@ -102,25 +76,19 @@ Engine_many_to_many : CroneEngine {
         synths[msg[1]-1].set(\end,msg[2]);
         });
         
-    this.addCommand("loop", "ii", {arg msg;
-        synths[msg[1]-1].set(\loop,msg[2]);
-        });
-        
     this.addCommand("loop_rate", "if", {arg msg;
         synths[msg[1]-1].set(\rate,msg[2]);
         });
-    
+        
     this.addCommand("loop_vol", "if", {arg msg;
         synths[msg[1]-1].set(\amp,msg[2]);
         });
         
-
-      
     
     }
 
     free {
-        synths.free;
-        buffers.free;
+        synths.do({arg item, i; item.free;});
+        buffers.do({arg item, i; item.free;});
     }
 }
